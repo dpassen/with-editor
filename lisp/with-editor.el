@@ -52,7 +52,7 @@
 
 ;; The command `with-editor-export-editor' exports `$EDITOR' or
 ;; another such environment variable in `shell-mode', `eshell-mode',
-;; `term-mode' and `vterm-mode' buffers.  Use this Emacs command
+;; `term-mode' `vterm-mode' and 'eat-mode' buffers.  Use this Emacs command
 ;; before executing a shell command which needs the editor set, or
 ;; always arrange for the current Emacs instance to be used as editor
 ;; by adding it to the appropriate mode hooks:
@@ -61,6 +61,7 @@
 ;;   (add-hook 'eshell-mode-hook #'with-editor-export-editor)
 ;;   (add-hook 'term-exec-hook   #'with-editor-export-editor)
 ;;   (add-hook 'vterm-mode-hook  #'with-editor-export-editor)
+;;   (add-hook 'eat-mode-hook    #'with-editor-export-editor)
 
 ;; Some variants of this function exist, these two forms are
 ;; equivalent:
@@ -737,8 +738,8 @@ Set and export the environment variable ENVVAR, by default
 \"EDITOR\".  The value is automatically generated to teach
 commands to use the current Emacs instance as \"the editor\".
 
-This works in `shell-mode', `term-mode', `eshell-mode' and
-`vterm'."
+This works in `shell-mode', `term-mode', `eshell-mode'
+`vterm' and `eat'."
   (interactive (list (with-editor-read-envvar)))
   (cond
    ((derived-mode-p 'comint-mode 'term-mode)
@@ -771,6 +772,18 @@ This works in `shell-mode', `term-mode', `eshell-mode' and
           (vterm-send-string "clear")
           (vterm-send-return))
       (error "Cannot use sleeping editor in this buffer")))
+   ((derived-mode-p 'eat-mode)
+    (when-let ((process (get-buffer-process (current-buffer))))
+      (let ((with-editor--envvar envvar))
+        (with-editor--setup)
+        (when-let ((v (getenv envvar)))
+          (process-send-string
+           process (format " export %s=%S\n" envvar v)))
+        (when-let ((v (getenv "EMACS_SERVER_FILE")))
+          (process-send-string
+           process (format " export EMACS_SERVER_FILE=%S\n" v)))
+        (process-send-string
+         process "clear\n"))))
    (t
     (error "Cannot export environment variables in this buffer")))
   (message "Successfully exported %s" envvar))
